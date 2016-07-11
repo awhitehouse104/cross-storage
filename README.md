@@ -1,4 +1,4 @@
-*This fork saves a string value rather than an object by making the expiration its own item. Still needs some work on retrieving the expiration, not currently a requirement for me.*
+*This fork saves a string value rather than an object by making the expiration its own item. Needs some work on retrieving the expiration, not currently a requirement for me.*
 
 ![cross-storage](https://github.com/zendesk/cross-storage/raw/master/media/logo.png)
 
