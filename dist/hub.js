@@ -89,7 +89,18 @@
     // Ignore the ready message when viewing the hub directly
     if (message.data === 'cross-storage:ready') return;
 
-    request = JSON.parse(message.data);
+    // Check whether message.data is a valid json
+    try {
+      request = JSON.parse(message.data);
+    } catch (err) {
+      return;
+    }
+
+    // Check whether request.method is a string
+    if (!request || typeof request.method !== 'string') {
+      return;
+    }
+
     method = request.method.split('cross-storage:')[1];
 
     if (!method) {
@@ -162,12 +173,16 @@
       throw new Error('ttl must be a number');
     }
 
-    item = {value:  params.value};
+    item = params.value;
     if (ttl) {
-      item.expire = CrossStorageHub._now() + ttl;
+      window.localStorage.setItem(params.key + '_expire', CrossStorageHub._now() + ttl);
     }
 
-    window.localStorage.setItem(params.key, JSON.stringify(item));
+    if (typeof item === 'object') {
+      item = JSON.stringify(item);
+    }
+
+    window.localStorage.setItem(params.key, item);
   };
 
   /**
@@ -180,22 +195,37 @@
    * @returns {*|*[]}  Either a single value, or an array
    */
   CrossStorageHub._get = function(params) {
-    var storage, result, i, item, key;
+    var storage, result, i, item, expire, key;
 
     storage = window.localStorage;
     result = [];
 
     for (i = 0; i < params.keys.length; i++) {
       key = params.keys[i];
-      item = JSON.parse(storage.getItem(key));
+      
+      try {
+        item = storage.getItem(key);
+
+        if (this._isJSONString(item)) {
+          item = JSON.parse(item);
+        }
+      } catch (e) {
+        item = null;
+      }
+
+      try {
+        expire = JSON.parse(storage.getItem(key + '_expire'));
+      } catch (e) {
+        expire = null;
+      }
 
       if (item === null) {
         result.push(null);
-      } else if (item.expire && item.expire < CrossStorageHub._now()) {
+      } else if (expire && expire < CrossStorageHub._now()) {
         storage.removeItem(key);
         result.push(null);
       } else {
-        result.push(item.value);
+        result.push(item);
       }
     }
 
@@ -210,6 +240,7 @@
   CrossStorageHub._del = function(params) {
     for (var i = 0; i < params.keys.length; i++) {
       window.localStorage.removeItem(params.keys[i]);
+      window.localStorage.removeItem(params.keys[i] + '_expire');
     }
   };
 
@@ -268,6 +299,21 @@
 
     return new Date().getTime();
   };
+
+  /**
+  * Tests if a string can be parsed as JSON.
+  *
+  * @param {string} value to test
+  * @returns {bool} whether or not the string can be parsed as JSON
+  */
+  CrossStorageHub._isJSONString = function(str) {
+    try {
+      JSON.parse(str);
+    } catch(e) {
+      return false;
+    }
+    return true;
+  }
 
   /**
    * Export for various environments.
